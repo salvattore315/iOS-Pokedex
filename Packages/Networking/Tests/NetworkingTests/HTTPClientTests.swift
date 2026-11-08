@@ -32,29 +32,30 @@ struct HTTPClientTests {
     @Test(arguments: [404, 500, 429])
     func mapsNonSuccessStatusCodes(statusCode: Int) async {
         URLProtocolStub.reset { _ in (.stub(statusCode), Data()) }
-        await #expect(throws: APIError.http(statusCode: statusCode)) {
-            _ = try await makeClient().data(for: ItemEndpoint())
+        let error = await caughtError { () async throws(APIError) in _ = try await makeClient().data(for: ItemEndpoint()) }
+        guard case .http(let code) = error else {
+            Issue.record("Expected .http, got \(String(describing: error))")
+            return
         }
+        #expect(code == statusCode)
     }
 
     @Test func reportsDecodingFailures() async {
         URLProtocolStub.reset { _ in (.stub(200), Data("not json".utf8)) }
-        do {
-            let _: Item = try await makeClient().send(ItemEndpoint())
-            Issue.record("Expected a decoding error")
-        } catch {
-            guard case .decoding(let underlying) = error else {
-                Issue.record("Expected .decoding, got \(error)")
-                return
-            }
-            #expect(underlying is DecodingError)
+        let error = await caughtError { () async throws(APIError) in let _: Item = try await makeClient().send(ItemEndpoint()) }
+        guard case .decoding(let underlying) = error else {
+            Issue.record("Expected .decoding, got \(String(describing: error))")
+            return
         }
+        #expect(underlying is DecodingError)
     }
 
     @Test func mapsOfflineErrors() async {
         URLProtocolStub.reset { _ in throw URLError(.notConnectedToInternet) }
-        await #expect(throws: APIError.offline) {
-            _ = try await makeClient().data(for: ItemEndpoint())
+        let error = await caughtError { () async throws(APIError) in _ = try await makeClient().data(for: ItemEndpoint()) }
+        guard case .offline = error else {
+            Issue.record("Expected .offline, got \(String(describing: error))")
+            return
         }
     }
 

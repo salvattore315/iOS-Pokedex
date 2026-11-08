@@ -44,14 +44,19 @@ struct EndpointTests {
 }
 
 struct APIErrorTests {
-    @Test(arguments: [
-        (URLError.Code.notConnectedToInternet, APIError.offline),
-        (.timedOut, .timeout),
-        (.cancelled, .cancelled),
-        (.badURL, .invalidURL),
-    ])
-    func mapsURLError(code: URLError.Code, expected: APIError) {
-        #expect(APIError(URLError(code)) == expected)
+    @Test func mapsOfflineURLErrors() {
+        for code: URLError.Code in [.notConnectedToInternet, .networkConnectionLost, .dataNotAllowed] {
+            guard case .offline = APIError(URLError(code)) else {
+                Issue.record("Expected .offline for \(code)")
+                continue
+            }
+        }
+    }
+
+    @Test func mapsTimeoutCancelAndBadURL() {
+        guard case .timeout = APIError(URLError(.timedOut)) else { Issue.record("Expected .timeout"); return }
+        guard case .cancelled = APIError(URLError(.cancelled)) else { Issue.record("Expected .cancelled"); return }
+        guard case .invalidURL = APIError(URLError(.badURL)) else { Issue.record("Expected .invalidURL"); return }
     }
 
     @Test func classifiesRetryableErrors() {

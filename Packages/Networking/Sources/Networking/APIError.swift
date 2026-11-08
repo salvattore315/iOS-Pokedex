@@ -32,25 +32,6 @@ public enum APIError: Error, Sendable {
     }
 }
 
-extension APIError: Equatable {
-    /// Compares by case. For `decoding`, the underlying errors are compared by their description,
-    /// since `Error` itself is not `Equatable`.
-    public static func == (lhs: APIError, rhs: APIError) -> Bool {
-        switch (lhs, rhs) {
-        case (.invalidURL, .invalidURL), (.offline, .offline), (.timeout, .timeout), (.cancelled, .cancelled):
-            true
-        case let (.http(a), .http(b)):
-            a == b
-        case let (.decoding(a), .decoding(b)):
-            String(describing: a) == String(describing: b)
-        case let (.transport(a), .transport(b)):
-            a == b
-        default:
-            false
-        }
-    }
-}
-
 extension APIError: CustomDebugStringConvertible {
     public var debugDescription: String {
         switch self {
