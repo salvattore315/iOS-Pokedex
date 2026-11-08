@@ -3,11 +3,11 @@ import Foundation
 /// Describes a single API call. Each API defines its own endpoints by conforming to this protocol.
 ///
 /// ```swift
-/// struct PokemonListEndpoint: Endpoint {
-///     let offset: Int
-///     var baseURL: URL { URL(string: "https://pokeapi.co/api/v2")! }
-///     var path: String { "pokemon" }
-///     var queryItems: [URLQueryItem] { [.init(name: "offset", value: "\(offset)"), .init(name: "limit", value: "20")] }
+/// struct UsersEndpoint: Endpoint {
+///     let page: Int
+///     var baseURL: URL { URL(string: "https://api.example.com/v1")! }
+///     var path: String { "users" }
+///     var queryItems: [URLQueryItem] { [.init(name: "page", value: "\(page)")] }
 /// }
 /// ```
 public protocol Endpoint: Sendable {
@@ -49,7 +49,7 @@ public extension Endpoint {
 }
 
 /// An endpoint built from an absolute URL, for APIs that return full links
-/// (for example the `next` page or a `species.url` in PokéAPI).
+/// (for example a `next` page link in a paginated response).
 public struct URLEndpoint: Endpoint {
     public let baseURL: URL
     public var path: String { "" }
