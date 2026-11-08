@@ -42,14 +42,12 @@ struct HTTPClientTests {
         do {
             let _: Item = try await makeClient().send(ItemEndpoint())
             Issue.record("Expected a decoding error")
-        } catch let error as APIError {
+        } catch {
             guard case .decoding(let underlying) = error else {
                 Issue.record("Expected .decoding, got \(error)")
                 return
             }
             #expect(underlying is DecodingError)
-        } catch {
-            Issue.record("Unexpected error \(error)")
         }
     }
 
