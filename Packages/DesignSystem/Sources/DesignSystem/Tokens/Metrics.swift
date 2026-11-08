@@ -1,0 +1,18 @@
+import CoreGraphics
+
+/// Spacing scale from the Figma "Spacing" collection.
+public enum Spacing {
+    public static let xs: CGFloat = 4
+    public static let sm: CGFloat = 8
+    public static let md: CGFloat = 12
+    public static let lg: CGFloat = 16
+    public static let xl: CGFloat = 24
+}
+
+/// Corner radius scale from the Figma "Spacing" collection.
+public enum Radius {
+    public static let sm: CGFloat = 4
+    public static let md: CGFloat = 8
+    public static let lg: CGFloat = 12
+    public static let xl: CGFloat = 24
+}
