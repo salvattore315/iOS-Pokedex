@@ -39,6 +39,8 @@ Pokedex/
   App/            PokedexApp, RootView (TabView), SplashVideoView
   Models/         Pokemon, PokemonType, Stat, EvolutionChain, Location…
   Services/       PokemonService (protocol), PokeAPIService, DTOs, mappers
+  UseCases/       CalculateWeaknesses
+  Shared/         AppError, ViewState
   Persistence/    SwiftData models: FavoritePokemon, PokemonIndexEntry
   Features/
     List/         PokemonListView, PokemonListViewModel
