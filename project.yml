@@ -58,6 +58,20 @@ targets:
         TEST_TARGET_NAME: Pokedex
     dependencies:
       - target: Pokedex
+  PokedexCatalog:
+    type: application
+    platform: iOS
+    sources: [Catalog]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.salvadormartinez.pokedex.catalog
+        INFOPLIST_KEY_CFBundleDisplayName: DS Catalog
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        TARGETED_DEVICE_FAMILY: "1"
+    dependencies:
+      - package: DesignSystem
 schemes:
   Pokedex:
     build:
@@ -67,3 +81,9 @@ schemes:
       targets:
         - PokedexTests
         - PokedexUITests
+  PokedexCatalog:
+    build:
+      targets:
+        PokedexCatalog: all
+    run:
+      config: Debug
