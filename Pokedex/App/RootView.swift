@@ -5,8 +5,10 @@ import DesignSystem
 struct RootView: View {
     @State private var listViewModel: PokemonListViewModel
     @State private var isCatalogPresented = false
+    private let dependencies: AppDependencies
 
     init(dependencies: AppDependencies) {
+        self.dependencies = dependencies
         _listViewModel = State(initialValue: PokemonListViewModel(source: dependencies.listSource, service: dependencies.service))
     }
 
@@ -16,7 +18,12 @@ struct RootView: View {
                 PokemonListView(viewModel: listViewModel, onTitleLongPress: openCatalog)
                     .toolbar(.hidden, for: .navigationBar)
                     .navigationDestination(for: Int.self) { id in
-                        DetailPlaceholderView(id: id)
+                        // Also handles taps on evolutions, which push the same destination.
+                        PokemonDetailView(viewModel: PokemonDetailViewModel(
+                            id: id,
+                            service: dependencies.service,
+                            calculateWeaknesses: DefaultCalculateWeaknessesUseCase(service: dependencies.service)
+                        ))
                     }
             }
             .tabItem {
