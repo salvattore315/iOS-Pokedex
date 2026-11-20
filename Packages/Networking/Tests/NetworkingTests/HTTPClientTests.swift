@@ -19,8 +19,8 @@ private let itemJSON = Data(#"{"id": 1, "display_name": "Bulbasaur"}"#.utf8)
 /// Runs serially because every test shares the global `URLProtocolStub` handler.
 @Suite(.serialized)
 struct HTTPClientTests {
-    private func makeClient(cache: ResponseCache? = nil) -> URLSessionHTTPClient {
-        URLSessionHTTPClient(session: URLProtocolStub.makeSession(), cache: cache)
+    private func makeClient(cache: ResponseCache? = nil, limiter: RequestLimiter? = nil) -> URLSessionHTTPClient {
+        URLSessionHTTPClient(session: URLProtocolStub.makeSession(), cache: cache, limiter: limiter)
     }
 
     @Test func decodesSuccessfulResponseWithSnakeCaseKeys() async throws {
@@ -95,5 +95,39 @@ struct HTTPClientTests {
         let data = try await client.data(for: ItemEndpoint())
         #expect(data == itemJSON)
         #expect(URLProtocolStub.requests.count == 2)
+    }
+
+    @Test func completesEveryRequestThroughTheLimiterAndFreesItsSlots() async throws {
+        URLProtocolStub.reset { _ in (.stub(200), itemJSON) }
+        let limiter = RequestLimiter(maxConcurrent: 2)
+        let client = makeClient(limiter: limiter)
+
+        try await withThrowingTaskGroup(of: Data.self) { group in
+            for id in 1...10 {
+                group.addTask { try await client.data(for: ItemEndpoint(id: id)) }
+            }
+            for try await data in group { #expect(data == itemJSON) }
+        }
+
+        #expect(URLProtocolStub.requests.count == 10)
+        #expect(await limiter.running == 0)
+    }
+
+    @Test func freesTheSlotWhenARequestFails() async throws {
+        URLProtocolStub.reset { _ in (.stub(500), Data()) }
+        let limiter = RequestLimiter(maxConcurrent: 1)
+        let client = makeClient(limiter: limiter)
+        _ = try? await client.data(for: ItemEndpoint())
+        #expect(await limiter.running == 0)
+    }
+
+    @Test func passesTheTaskPriorityToTheURLSessionTask() async throws {
+        URLProtocolStub.reset { _ in (.stub(200), itemJSON) }
+        let client = makeClient()
+        _ = try await Task(priority: .userInitiated) { try await client.data(for: ItemEndpoint(id: 1)) }.value
+        // Awaiting `value` would escalate the task's priority, so wait for the request to arrive instead.
+        Task(priority: .utility) { _ = try await client.data(for: ItemEndpoint(id: 2)) }
+        while URLProtocolStub.priorities.all.count < 2 { await Task.yield() }
+        #expect(URLProtocolStub.priorities.all == [URLSessionTask.highPriority, URLSessionTask.lowPriority])
     }
 }
