@@ -10,6 +10,9 @@ struct SplashVideoView: View {
     /// The videos last 4.4 s. If playback stalls or fails, the splash closes anyway after this.
     static let maxDuration: Duration = .seconds(6)
 
+    /// Launch argument that starts the app without the splash. UI tests pass it to avoid waiting for the video.
+    static let skipLaunchArgument = "-skipSplash"
+
     let onFinish: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
