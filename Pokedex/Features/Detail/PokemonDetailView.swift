@@ -123,7 +123,8 @@ struct PokemonDetailView: View {
         section(
             String(localized: "detail.weaknesses", defaultValue: "Weaknesses"),
             state: viewModel.weaknesses,
-            emptyText: String(localized: "detail.weaknesses.empty", defaultValue: "No weaknesses.")
+            emptyText: String(localized: "detail.weaknesses.empty", defaultValue: "No weaknesses."),
+            retry: viewModel.retryWeaknesses
         ) { weaknesses in
             FlowLayout(spacing: Spacing.sm) {
                 ForEach(weaknesses, id: \.type) { weakness in
@@ -137,7 +138,8 @@ struct PokemonDetailView: View {
         section(
             String(localized: "detail.evolutions", defaultValue: "Evolutions"),
             state: viewModel.evolutions,
-            emptyText: String(localized: "detail.evolutions.empty", defaultValue: "This Pokémon does not evolve.")
+            emptyText: String(localized: "detail.evolutions.empty", defaultValue: "This Pokémon does not evolve."),
+            retry: viewModel.retryEvolutions
         ) { stages in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Spacing.md) {
@@ -160,7 +162,8 @@ struct PokemonDetailView: View {
         section(
             String(localized: "detail.locations", defaultValue: "Locations"),
             state: viewModel.encounters,
-            emptyText: String(localized: "detail.locations.empty", defaultValue: "Not found in the wild.")
+            emptyText: String(localized: "detail.locations.empty", defaultValue: "Not found in the wild."),
+            retry: viewModel.retryEncounters
         ) { encounters in
             VStack(spacing: Spacing.sm) {
                 ForEach(encounters, id: \.locationArea) { encounter in
@@ -175,11 +178,13 @@ struct PokemonDetailView: View {
 
     // MARK: - Helpers
 
-    /// Title plus the right content for a section's state.
+    /// Title plus the right content for a section's state. A failed section offers `retry`
+    /// when the error is retryable, so it never stays stuck.
     private func section<Value, Content: View>(
         _ title: String,
         state: ViewState<Value>,
         emptyText: String,
+        retry: @escaping () async -> Void,
         @ViewBuilder content: @escaping (Value) -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
@@ -192,7 +197,15 @@ struct PokemonDetailView: View {
             case .empty:
                 Text(emptyText).font(.callout).foregroundStyle(Color.DS.textSecondary)
             case .failed(let error):
-                Text(error.message).font(.callout).foregroundStyle(Color.DS.danger)
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    Text(error.message).font(.callout).foregroundStyle(Color.DS.danger)
+                    if error.isRetryable {
+                        Button(String(localized: "action.retry", defaultValue: "Retry")) {
+                            Task { await retry() }
+                        }
+                        .font(.mono(13, weight: .bold))
+                    }
+                }
             }
         }
     }

@@ -41,6 +41,26 @@ final class PokemonDetailViewModel {
         _ = await (speciesAndEvolutions, typeWeaknesses, locations)
     }
 
+    // MARK: - Retry
+
+    /// Loads species and evolutions again. Does nothing until the Pokémon itself has loaded.
+    func retryEvolutions() async {
+        guard let pokemon = pokemon.value else { return }
+        await loadSpecies(id: pokemon.speciesID)
+    }
+
+    /// Loads the weaknesses again. Does nothing until the Pokémon itself has loaded.
+    func retryWeaknesses() async {
+        guard let pokemon = pokemon.value else { return }
+        await loadWeaknesses(for: pokemon.types)
+    }
+
+    /// Loads the locations again. Does nothing until the Pokémon itself has loaded.
+    func retryEncounters() async {
+        guard pokemon.value != nil else { return }
+        await loadEncounters()
+    }
+
     // MARK: - Sections
 
     private func loadSpecies(id speciesID: Int) async {

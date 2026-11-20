@@ -78,6 +78,110 @@ struct PokemonDetailViewModelTests {
     }
 }
 
+// MARK: - Retry
+
+extension PokemonDetailViewModelTests {
+    @Test func retryRecoversEveryFailedSection() async {
+        let service = RecoveringDetailService(
+            pokemon: Self.bulbasaur,
+            species: PokemonSpecies(id: 1, flavorText: nil, genus: "Seed Pokémon", evolutionChainURL: Self.chainURL),
+            chain: Self.chain,
+            encounters: [Encounter(locationArea: "viridian-forest-area", versions: ["red"], methods: ["walk"])]
+        )
+        let weakness = Weakness(type: .fire, multiplier: 2)
+        let weaknesses = RecoveringWeaknesses(result: [weakness])
+        let viewModel = PokemonDetailViewModel(id: 1, service: service, calculateWeaknesses: weaknesses)
+
+        await viewModel.load()
+        #expect(viewModel.evolutions == .failed(.offline))
+        #expect(viewModel.weaknesses == .failed(.offline))
+        #expect(viewModel.encounters == .failed(.offline))
+
+        await viewModel.retryEvolutions()
+        await viewModel.retryWeaknesses()
+        await viewModel.retryEncounters()
+
+        #expect(viewModel.species.value?.genus == "Seed Pokémon")
+        #expect(viewModel.evolutions.value?.map(\.name) == ["bulbasaur", "ivysaur"])
+        #expect(viewModel.weaknesses == .loaded([weakness]))
+        #expect(viewModel.encounters.value?.count == 1)
+    }
+
+    @Test func retryDoesNothingBeforeThePokemonLoads() async {
+        let viewModel = makeViewModel(DetailStubService(pokemon: .failure(.offline)))
+        await viewModel.load()
+
+        await viewModel.retryEvolutions()
+        await viewModel.retryWeaknesses()
+        await viewModel.retryEncounters()
+
+        #expect(viewModel.evolutions == .idle)
+        #expect(viewModel.weaknesses == .idle)
+        #expect(viewModel.encounters == .idle)
+    }
+}
+
+/// Fails the first call of each section with `.offline` and answers every later call.
+private final class RecoveringDetailService: PokemonService, @unchecked Sendable {
+    private let lock = NSLock()
+    private var calls: [String: Int] = [:]
+    private let pokemon: Pokemon
+    private let species: PokemonSpecies
+    private let chain: EvolutionNode
+    private let encounters: [Encounter]
+
+    init(pokemon: Pokemon, species: PokemonSpecies, chain: EvolutionNode, encounters: [Encounter]) {
+        self.pokemon = pokemon
+        self.species = species
+        self.chain = chain
+        self.encounters = encounters
+    }
+
+    /// Throws on the first call for `key` only.
+    private func failFirstCall(_ key: String) throws(AppError) {
+        let count = lock.withLock {
+            calls[key, default: 0] += 1
+            return calls[key]!
+        }
+        if count == 1 { throw .offline }
+    }
+
+    func pokemon(id: Int) async throws(AppError) -> Pokemon { pokemon }
+    func species(id: Int) async throws(AppError) -> PokemonSpecies {
+        try failFirstCall("species")
+        return species
+    }
+    func evolutionChain(url: URL) async throws(AppError) -> EvolutionNode { chain }
+    func encounters(pokemonID: Int) async throws(AppError) -> [Encounter] {
+        try failFirstCall("encounters")
+        return encounters
+    }
+
+    func pokemonIndex() async throws(AppError) -> [PokemonSummary] { throw .unexpected }
+    func pokemonPage(offset: Int, limit: Int) async throws(AppError) -> Page<PokemonSummary> { throw .unexpected }
+    func damageRelations(for type: PokemonType) async throws(AppError) -> TypeDamageRelations { throw .unexpected }
+    func pokemonIDs(ofType type: PokemonType) async throws(AppError) -> Set<Int> { throw .unexpected }
+    func speciesIDs(inGeneration id: Int) async throws(AppError) -> Set<Int> { throw .unexpected }
+}
+
+/// Fails the first calculation with `.offline` and returns `result` afterwards.
+private final class RecoveringWeaknesses: CalculateWeaknessesUseCase, @unchecked Sendable {
+    private let lock = NSLock()
+    private var calls = 0
+    private let result: [Weakness]
+
+    init(result: [Weakness]) { self.result = result }
+
+    func execute(for types: [PokemonType]) async throws(AppError) -> [Weakness] {
+        let count = lock.withLock {
+            calls += 1
+            return calls
+        }
+        if count == 1 { throw .offline }
+        return result
+    }
+}
+
 /// ``PokemonService`` with one canned answer per detail request.
 private struct DetailStubService: PokemonService {
     var pokemon: Result<Pokemon, AppError>
