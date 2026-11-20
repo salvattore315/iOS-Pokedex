@@ -5,6 +5,7 @@ import Networking
 @main
 struct PokedexApp: App {
     private let dependencies: AppDependencies
+    @State private var isSplashVisible = true
 
     init() {
         // AsyncImage caches artwork through the shared URL cache. The default size is too small for the grid.
@@ -14,7 +15,15 @@ struct PokedexApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView(dependencies: dependencies)
+            ZStack {
+                RootView(dependencies: dependencies)
+                if isSplashVisible {
+                    SplashVideoView {
+                        withAnimation(.easeOut(duration: 0.25)) { isSplashVisible = false }
+                    }
+                    .transition(.opacity)
+                }
+            }
         }
     }
 }
