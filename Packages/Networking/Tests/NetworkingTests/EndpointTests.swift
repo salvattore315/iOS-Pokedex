@@ -37,6 +37,12 @@ struct EndpointTests {
         #expect(request.url == url)
     }
 
+    @Test func neverAssumesHTTP3UpFront() throws {
+        let request = try ListEndpoint().makeRequest()
+        #expect(!request.assumesHTTP3Capable)
+        #expect(request.timeoutInterval == 15)
+    }
+
     @Test func usesCustomTimeout() throws {
         let request = try ListEndpoint().makeRequest(timeout: 5)
         #expect(request.timeoutInterval == 5)

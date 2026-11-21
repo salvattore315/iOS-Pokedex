@@ -130,4 +130,71 @@ struct HTTPClientTests {
         while URLProtocolStub.priorities.all.count < 2 { await Task.yield() }
         #expect(URLProtocolStub.priorities.all == [URLSessionTask.highPriority, URLSessionTask.lowPriority])
     }
+
+    // MARK: - Stalled connections
+
+    @Test(arguments: [URLError.Code.timedOut, .networkConnectionLost])
+    func retriesAStalledGetOnce(code: URLError.Code) async throws {
+        let calls = RequestLog()
+        URLProtocolStub.reset { request in
+            calls.record(request)
+            if calls.count == 1 { throw URLError(code) }
+            return (.stub(200), itemJSON)
+        }
+        let data = try await makeClient().data(for: ItemEndpoint())
+        #expect(data == itemJSON)
+        #expect(URLProtocolStub.requests.count == 2)
+    }
+
+    @Test func reportsTimeoutWhenTheRetryAlsoStalls() async {
+        URLProtocolStub.reset { _ in throw URLError(.timedOut) }
+        let error = await caughtError { () async throws(APIError) in _ = try await makeClient().data(for: ItemEndpoint()) }
+        guard case .timeout = error else {
+            Issue.record("Expected .timeout, got \(String(describing: error))")
+            return
+        }
+        #expect(URLProtocolStub.requests.count == 2)
+    }
+
+    @Test func neverRetriesNonGetRequests() async {
+        URLProtocolStub.reset { _ in throw URLError(.timedOut) }
+        _ = await caughtError { () async throws(APIError) in _ = try await makeClient().data(for: ItemEndpoint(method: .post)) }
+        #expect(URLProtocolStub.requests.count == 1)
+    }
+
+    @Test func doesNotRetryOtherFailures() async {
+        URLProtocolStub.reset { _ in throw URLError(.notConnectedToInternet) }
+        _ = await caughtError { () async throws(APIError) in _ = try await makeClient().data(for: ItemEndpoint()) }
+        #expect(URLProtocolStub.requests.count == 1)
+    }
+}
+
+/// The session the app uses instead of `URLSession.shared`.
+struct SessionConfigurationTests {
+    @Test func keepsTheGivenDiskCache() {
+        let cache = URLCache(memoryCapacity: 0, diskCapacity: 1024 * 1024)
+        let configuration = URLSessionHTTPClient.makeConfiguration(urlCache: cache)
+        #expect(configuration.urlCache === cache)
+        #expect(configuration.requestCachePolicy == .useProtocolCachePolicy)
+    }
+
+    @Test func usesTheSharedCacheByDefault() {
+        #expect(URLSessionHTTPClient.makeConfiguration().urlCache === URLCache.shared)
+    }
+
+    @Test func failsFastInsteadOfHanging() {
+        let configuration = URLSessionHTTPClient.makeConfiguration()
+        #expect(configuration.timeoutIntervalForRequest == URLSessionHTTPClient.defaultTimeout)
+        #expect(configuration.timeoutIntervalForResource == 60)
+        #expect(!configuration.waitsForConnectivity)
+        #expect(configuration.httpMaximumConnectionsPerHost == 4)
+    }
+
+    @Test func sessionUsesTheConfiguration() {
+        let cache = URLCache(memoryCapacity: 0, diskCapacity: 1024 * 1024)
+        let session = URLSessionHTTPClient.makeSession(urlCache: cache)
+        #expect(session !== URLSession.shared)
+        #expect(session.configuration.urlCache === cache)
+        #expect(session.configuration.timeoutIntervalForRequest == URLSessionHTTPClient.defaultTimeout)
+    }
 }

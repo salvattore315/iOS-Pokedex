@@ -8,7 +8,8 @@ struct PokedexApp: App {
     @State private var isSplashVisible = !ProcessInfo.processInfo.arguments.contains(SplashVideoView.skipLaunchArgument)
 
     init() {
-        // AsyncImage caches artwork through the shared URL cache. The default size is too small for the grid.
+        // AsyncImage and the API client cache responses on disk through the shared URL cache.
+        // The default size is too small for the grid.
         URLCache.shared = URLCache(memoryCapacity: 50 * 1024 * 1024, diskCapacity: 200 * 1024 * 1024)
         dependencies = .live()
     }
@@ -36,7 +37,12 @@ struct AppDependencies {
 
     static func live(mode: ListSourceMode = .current) -> AppDependencies {
         // A few requests at a time, so the detail screen never queues behind dozens of list cards.
-        let client = URLSessionHTTPClient(cache: ResponseCache(), limiter: RequestLimiter(maxConcurrent: 4))
+        // Own session on the disk cache sized in init(); stalled requests are retried once on a new connection.
+        let client = URLSessionHTTPClient(
+            session: URLSessionHTTPClient.makeSession(urlCache: .shared),
+            cache: ResponseCache(),
+            limiter: RequestLimiter(maxConcurrent: 4)
+        )
         let service = PokeAPIService(client: client)
         let container: ModelContainer
         do {

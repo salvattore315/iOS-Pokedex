@@ -24,6 +24,10 @@ public extension HTTPClient {
 ///
 /// The priority of the calling task is passed on: it orders requests waiting in the ``RequestLimiter``
 /// and sets the priority of the underlying `URLSessionTask`.
+///
+/// A GET that times out or loses its connection is sent once more. With HTTP/3 every request to a host
+/// shares one QUIC connection; when the network silently drops its packets, all of them hang until the
+/// timeout. The stalled connection is closed by then, so the retry opens a new one.
 public final class URLSessionHTTPClient: HTTPClient {
     private let session: URLSession
     private let cache: ResponseCache?
@@ -32,16 +36,18 @@ public final class URLSessionHTTPClient: HTTPClient {
     private let makeDecoder: @Sendable () -> JSONDecoder
 
     /// - Parameters:
-    ///   - session: The session used to perform requests. Inject a custom one in tests.
+    ///   - session: The session used to perform requests. Defaults to ``makeSession(urlCache:)``.
+    ///     Inject a custom one in tests.
     ///   - cache: Optional cache for GET responses. Pass `nil` to always hit the network.
     ///   - limiter: Optional cap on concurrent requests. Pass `nil` for no cap.
-    ///   - timeout: Request timeout in seconds.
+    ///   - timeout: Request timeout in seconds. Short enough that a stalled request can be retried
+    ///     before the user gives up.
     ///   - makeDecoder: Builds the decoder for each response. Defaults to snake_case keys.
     public init(
-        session: URLSession = .shared,
+        session: URLSession = URLSessionHTTPClient.makeSession(),
         cache: ResponseCache? = nil,
         limiter: RequestLimiter? = nil,
-        timeout: TimeInterval = 30,
+        timeout: TimeInterval = URLSessionHTTPClient.defaultTimeout,
         makeDecoder: @escaping @Sendable () -> JSONDecoder = URLSessionHTTPClient.defaultDecoder
     ) {
         self.session = session
@@ -92,27 +98,54 @@ public final class URLSessionHTTPClient: HTTPClient {
         return try result.get()
     }
 
-    /// Sends the request and validates the status code.
+    /// Sends the request, retrying a GET once if the connection stalled.
     private func load(_ request: URLRequest) async throws(APIError) -> Data {
+        let isIdempotent = request.httpMethod == HTTPMethod.get.rawValue
+        do {
+            return try await loadOnce(request)
+        } catch let error as URLError where isIdempotent && Self.isStall(error) {
+            do {
+                return try await loadOnce(request)
+            } catch {
+                throw Self.apiError(from: error)
+            }
+        } catch {
+            throw Self.apiError(from: error)
+        }
+    }
+
+    /// `true` for failures a fresh connection may fix.
+    static func isStall(_ error: URLError) -> Bool {
+        error.code == .timedOut || error.code == .networkConnectionLost
+    }
+
+    /// Sends the request and validates the status code. Transport failures are thrown as `URLError`
+    /// so ``load(_:)`` can tell a stall from other errors; anything else is already an ``APIError``.
+    private func loadOnce(_ request: URLRequest) async throws -> Data {
         let data: Data
         let response: URLResponse
         do {
             (data, response) = try await session.data(for: request, delegate: TaskPriorityDelegate(Task.currentPriority))
-        } catch let error as URLError {
-            throw APIError(error)
         } catch is CancellationError {
-            throw .cancelled
-        } catch {
-            throw .transport(URLError(.unknown))
+            throw APIError.cancelled
         }
 
         guard let http = response as? HTTPURLResponse else {
-            throw .transport(URLError(.badServerResponse))
+            throw APIError.transport(URLError(.badServerResponse))
         }
         guard (200..<300).contains(http.statusCode) else {
-            throw .http(statusCode: http.statusCode)
+            throw APIError.http(statusCode: http.statusCode)
         }
         return data
+    }
+
+    private static func apiError(from error: any Error) -> APIError {
+        switch error {
+        case let error as APIError: error
+        case let error as URLError: APIError(error)
+        case is CancellationError: .cancelled
+        default: .transport(URLError(.unknown))
+        }
     }
 
     /// A decoder that maps `snake_case` JSON keys to `camelCase` properties.
@@ -120,6 +153,35 @@ public final class URLSessionHTTPClient: HTTPClient {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return decoder
+    }
+}
+
+// MARK: - Session
+
+public extension URLSessionHTTPClient {
+    /// Default request timeout, in seconds.
+    static let defaultTimeout: TimeInterval = 15
+
+    /// The configuration behind ``makeSession(urlCache:)``, spelled out instead of relying on `URLSession.shared`.
+    ///
+    /// - Parameter urlCache: Disk cache for HTTP responses. Defaults to `URLCache.shared`, which the app sizes at launch.
+    static func makeConfiguration(urlCache: URLCache = .shared) -> URLSessionConfiguration {
+        let configuration = URLSessionConfiguration.default
+        configuration.urlCache = urlCache
+        configuration.requestCachePolicy = .useProtocolCachePolicy
+        configuration.timeoutIntervalForRequest = defaultTimeout
+        // Gives up on a request (retry included) instead of waiting minutes for the network.
+        configuration.timeoutIntervalForResource = 60
+        // Fail fast when offline so the screen can offer a retry.
+        configuration.waitsForConnectivity = false
+        // Matches the app's RequestLimiter, so HTTP/1.1 and HTTP/2 fallbacks never queue behind each other.
+        configuration.httpMaximumConnectionsPerHost = 4
+        return configuration
+    }
+
+    /// A dedicated session built from ``makeConfiguration(urlCache:)``.
+    static func makeSession(urlCache: URLCache = .shared) -> URLSession {
+        URLSession(configuration: makeConfiguration(urlCache: urlCache))
     }
 }
 
