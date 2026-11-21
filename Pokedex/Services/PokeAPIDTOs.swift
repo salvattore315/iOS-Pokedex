@@ -112,6 +112,15 @@ struct EncounterDTO: Decodable, Sendable {
     let versionDetails: [VersionDetail]
 }
 
+struct LocationAreaDTO: Decodable, Sendable {
+    let location: NamedAPIResourceDTO
+}
+
+struct LocationDTO: Decodable, Sendable {
+    /// `null` for a few locations that belong to no region.
+    let region: NamedAPIResourceDTO?
+}
+
 struct TypeDTO: Decodable, Sendable {
     struct DamageRelations: Decodable, Sendable {
         let doubleDamageFrom: [NamedAPIResourceDTO]
