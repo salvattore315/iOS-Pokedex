@@ -17,14 +17,7 @@ struct RootView: View {
             NavigationStack {
                 PokemonListView(viewModel: listViewModel, onTitleLongPress: openCatalog)
                     .toolbar(.hidden, for: .navigationBar)
-                    .navigationDestination(for: Int.self) { id in
-                        // Also handles taps on evolutions, which push the same destination.
-                        PokemonDetailView(viewModel: PokemonDetailViewModel(
-                            id: id,
-                            service: dependencies.service,
-                            calculateWeaknesses: DefaultCalculateWeaknessesUseCase(service: dependencies.service)
-                        ))
-                    }
+                    .navigationDestination(for: Int.self, destination: detail)
             }
             .tabItem {
                 Label(String(localized: "tab.pokedex", defaultValue: "Pokédex"), systemImage: "square.grid.2x2")
@@ -38,6 +31,16 @@ struct RootView: View {
         .sheet(isPresented: $isCatalogPresented) {
             DesignSystemCatalog()
         }
+    }
+
+    /// The detail screen for a Pokémon ID. Also handles taps on evolutions, which push the same destination.
+    private func detail(id: Int) -> some View {
+        PokemonDetailView(viewModel: PokemonDetailViewModel(
+            id: id,
+            service: dependencies.service,
+            calculateWeaknesses: DefaultCalculateWeaknessesUseCase(service: dependencies.service),
+            favorites: dependencies.favorites
+        ))
     }
 
     /// The design-system catalog is a developer tool: release builds ignore the long press.
