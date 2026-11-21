@@ -45,7 +45,8 @@ struct RootView: View {
             id: id,
             service: dependencies.service,
             calculateWeaknesses: DefaultCalculateWeaknessesUseCase(service: dependencies.service),
-            favorites: dependencies.favorites
+            favorites: dependencies.favorites,
+            groupLocations: dependencies.groupLocations
         ))
     }
 
