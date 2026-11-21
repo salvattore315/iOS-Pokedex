@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Top bar of the detail screen: back, device status, cry and favorite.
+/// Paints its own `shell` background, like `DeviceTopBar`.
 public struct DetailTopBar: View {
     private let isFavorite: Bool
     private let isCryAvailable: Bool
@@ -49,9 +50,10 @@ public struct DetailTopBar: View {
         }
         .padding(.horizontal, Spacing.lg)
         .padding(.vertical, Spacing.sm)
+        .background(Color.DS.shell.ignoresSafeArea(edges: .top))
     }
 }
 
 #Preview {
-    DetailTopBar(isFavorite: true, onBack: {}, onCry: {}, onFavorite: {}).background(Color.DS.shell)
+    DetailTopBar(isFavorite: true, onBack: {}, onCry: {}, onFavorite: {})
 }

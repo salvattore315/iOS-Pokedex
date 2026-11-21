@@ -33,8 +33,8 @@ public struct DesignSystemCatalog: View {
                     page("LocationRow") { LocationRow(title: "Viridian Forest", subtitle: "Red · Walk") }
                 }
                 Section("Organisms") {
-                    page("DeviceTopBar") { DeviceTopBar("Pokédex").background(Color.DS.shell) }
-                    page("DetailTopBar") { DetailTopBar(isFavorite: true, onBack: {}, onCry: {}, onFavorite: {}).background(Color.DS.shell) }
+                    page("DeviceTopBar") { DeviceTopBar("Pokédex") }
+                    page("DetailTopBar") { DetailTopBar(isFavorite: true, onBack: {}, onCry: {}, onFavorite: {}) }
                     page("ScanViewer") { ScanViewer(number: 1, tint: TypeTint.grass.color) { Circle().fill(TypeTint.grass.color.opacity(0.6)) } }
                     page("StatsLCD") { StatsLCD(title: "Base stats", entries: [.init(label: "HP", value: 45), .init(label: "Atk", value: 49), .init(label: "Spd", value: 45)], tint: TypeTint.grass.color) }
                     page("StateMessage") { StateMessage(systemImage: "wifi.slash", title: "No connection", message: "Check your connection and try again.", actionTitle: "Retry") {} }
