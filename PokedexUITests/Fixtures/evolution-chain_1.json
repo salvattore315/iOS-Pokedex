@@ -1,0 +1,23 @@
+{
+  "chain": {
+    "species": {
+      "name": "bulbasaur",
+      "url": "https://pokeapi.co/api/v2/pokemon-species/1/"
+    },
+    "evolution_details": [],
+    "evolves_to": [
+      {
+        "species": {
+          "name": "ivysaur",
+          "url": "https://pokeapi.co/api/v2/pokemon-species/2/"
+        },
+        "evolution_details": [
+          {
+            "min_level": 16
+          }
+        ],
+        "evolves_to": []
+      }
+    ]
+  }
+}
