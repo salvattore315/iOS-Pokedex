@@ -23,12 +23,14 @@ targets:
   Pokedex:
     type: application
     platform: iOS
-    sources: [Pokedex]
+    sources:
+      - path: Pokedex
+        excludes: [Resources/Info.plist]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.salvadormartinez.pokedex
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_FILE: Pokedex/Resources/Info.plist
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         TARGETED_DEVICE_FAMILY: "1"
