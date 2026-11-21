@@ -11,7 +11,11 @@ struct PokedexApp: App {
         // AsyncImage and the API client cache responses on disk through the shared URL cache.
         // The default size is too small for the grid.
         URLCache.shared = URLCache(memoryCapacity: 50 * 1024 * 1024, diskCapacity: 200 * 1024 * 1024)
+        #if DEBUG
+        dependencies = UITestLaunch.dependencies() ?? .live()
+        #else
         dependencies = .live()
+        #endif
     }
 
     var body: some Scene {
@@ -45,10 +49,19 @@ struct AppDependencies {
             cache: ResponseCache(),
             limiter: RequestLimiter(maxConcurrent: 4)
         )
+        return make(client: client, mode: mode, isStoredInMemoryOnly: false)
+    }
+
+    /// Builds the whole graph on top of `client`.
+    /// - Parameter isStoredInMemoryOnly: `true` starts with an empty index and no favorites on every launch.
+    static func make(client: any HTTPClient, mode: ListSourceMode, isStoredInMemoryOnly: Bool) -> AppDependencies {
         let service = PokeAPIService(client: client)
         let container: ModelContainer
         do {
-            container = try ModelContainer(for: PokemonIndexEntry.self, FavoritePokemon.self)
+            container = try ModelContainer(
+                for: PokemonIndexEntry.self, FavoritePokemon.self,
+                configurations: ModelConfiguration(isStoredInMemoryOnly: isStoredInMemoryOnly)
+            )
         } catch {
             // Without a store the app cannot keep its index; there is nothing sensible to fall back to.
             fatalError("Could not create the SwiftData container: \(error)")
