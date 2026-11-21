@@ -19,8 +19,14 @@ private let itemJSON = Data(#"{"id": 1, "display_name": "Bulbasaur"}"#.utf8)
 /// Runs serially because every test shares the global `URLProtocolStub` handler.
 @Suite(.serialized)
 struct HTTPClientTests {
-    private func makeClient(cache: ResponseCache? = nil, limiter: RequestLimiter? = nil) -> URLSessionHTTPClient {
-        URLSessionHTTPClient(session: URLProtocolStub.makeSession(), cache: cache, limiter: limiter)
+    private func makeClient(cache: ResponseCache? = nil, limiter: RequestLimiter? = nil, fallback: URLSession? = nil) -> URLSessionHTTPClient {
+        URLSessionHTTPClient(session: URLProtocolStub.makeSession(), fallbackSession: fallback, cache: cache, limiter: limiter)
+    }
+
+    /// A stub session that tags its requests, so the stub can tell it apart from the main one.
+    private static let fallbackHeader = "X-Fallback"
+    private func makeFallbackSession() -> URLSession {
+        URLProtocolStub.makeSession(headers: [Self.fallbackHeader: "1"])
     }
 
     @Test func decodesSuccessfulResponseWithSnakeCaseKeys() async throws {
@@ -134,11 +140,44 @@ struct HTTPClientTests {
     // MARK: - Stalled connections
 
     @Test(arguments: [URLError.Code.timedOut, .networkConnectionLost])
-    func retriesAStalledGetOnce(code: URLError.Code) async throws {
+    func retriesAStalledGetOnceOnTheFallbackSession(code: URLError.Code) async throws {
+        URLProtocolStub.reset { request in
+            if request.value(forHTTPHeaderField: Self.fallbackHeader) == nil { throw URLError(code) }
+            return (.stub(200), itemJSON)
+        }
+        let data = try await makeClient(fallback: makeFallbackSession()).data(for: ItemEndpoint())
+        #expect(data == itemJSON)
+        #expect(URLProtocolStub.requests.count == 2)
+    }
+
+    @Test func keepsUsingTheFallbackAfterAStall() async throws {
+        URLProtocolStub.reset { request in
+            if request.value(forHTTPHeaderField: Self.fallbackHeader) == nil { throw URLError(.timedOut) }
+            return (.stub(200), itemJSON)
+        }
+        let client = makeClient(fallback: makeFallbackSession())
+        _ = try await client.data(for: ItemEndpoint(id: 1))
+        _ = try await client.data(for: ItemEndpoint(id: 2))
+        // One stalled request on the main session, then only the fallback.
+        #expect(URLProtocolStub.requests.count == 3)
+        #expect(URLProtocolStub.requests.all.last?.value(forHTTPHeaderField: Self.fallbackHeader) == "1")
+    }
+
+    @Test func staysOnTheMainSessionWhileNothingStalls() async throws {
+        URLProtocolStub.reset { _ in throw URLError(.notConnectedToInternet) }
+        let client = makeClient(fallback: makeFallbackSession())
+        _ = await caughtError { () async throws(APIError) in _ = try await client.data(for: ItemEndpoint()) }
+        URLProtocolStub.handler = { _ in (.stub(200), itemJSON) }
+        _ = try await client.data(for: ItemEndpoint())
+        #expect(URLProtocolStub.requests.count == 2)
+        #expect(URLProtocolStub.requests.all.allSatisfy { $0.value(forHTTPHeaderField: Self.fallbackHeader) == nil })
+    }
+
+    @Test func retriesOnTheSameSessionWithoutAFallback() async throws {
         let calls = RequestLog()
         URLProtocolStub.reset { request in
             calls.record(request)
-            if calls.count == 1 { throw URLError(code) }
+            if calls.count == 1 { throw URLError(.timedOut) }
             return (.stub(200), itemJSON)
         }
         let data = try await makeClient().data(for: ItemEndpoint())
@@ -148,7 +187,9 @@ struct HTTPClientTests {
 
     @Test func reportsTimeoutWhenTheRetryAlsoStalls() async {
         URLProtocolStub.reset { _ in throw URLError(.timedOut) }
-        let error = await caughtError { () async throws(APIError) in _ = try await makeClient().data(for: ItemEndpoint()) }
+        let error = await caughtError { () async throws(APIError) in
+            _ = try await makeClient(fallback: makeFallbackSession()).data(for: ItemEndpoint())
+        }
         guard case .timeout = error else {
             Issue.record("Expected .timeout, got \(String(describing: error))")
             return
@@ -158,13 +199,17 @@ struct HTTPClientTests {
 
     @Test func neverRetriesNonGetRequests() async {
         URLProtocolStub.reset { _ in throw URLError(.timedOut) }
-        _ = await caughtError { () async throws(APIError) in _ = try await makeClient().data(for: ItemEndpoint(method: .post)) }
+        _ = await caughtError { () async throws(APIError) in
+            _ = try await makeClient(fallback: makeFallbackSession()).data(for: ItemEndpoint(method: .post))
+        }
         #expect(URLProtocolStub.requests.count == 1)
     }
 
     @Test func doesNotRetryOtherFailures() async {
         URLProtocolStub.reset { _ in throw URLError(.notConnectedToInternet) }
-        _ = await caughtError { () async throws(APIError) in _ = try await makeClient().data(for: ItemEndpoint()) }
+        _ = await caughtError { () async throws(APIError) in
+            _ = try await makeClient(fallback: makeFallbackSession()).data(for: ItemEndpoint())
+        }
         #expect(URLProtocolStub.requests.count == 1)
     }
 }
@@ -188,6 +233,16 @@ struct SessionConfigurationTests {
         #expect(configuration.timeoutIntervalForResource == 60)
         #expect(!configuration.waitsForConnectivity)
         #expect(configuration.httpMaximumConnectionsPerHost == 4)
+    }
+
+    @Test func fallbackStaysOnTCP() {
+        let cache = URLCache(memoryCapacity: 0, diskCapacity: 1024 * 1024)
+        let configuration = URLSessionHTTPClient.makeFallbackConfiguration(urlCache: cache)
+        // QUIC needs TLS 1.3: capping at 1.2 rules out HTTP/3.
+        #expect(configuration.tlsMaximumSupportedProtocolVersion == .TLSv12)
+        #expect(configuration.urlCache === cache)
+        #expect(configuration.timeoutIntervalForRequest == URLSessionHTTPClient.defaultTimeout)
+        #expect(URLSessionHTTPClient.makeConfiguration().tlsMaximumSupportedProtocolVersion != .TLSv12)
     }
 
     @Test func sessionUsesTheConfiguration() {

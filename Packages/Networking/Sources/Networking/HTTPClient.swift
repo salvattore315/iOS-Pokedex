@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Sends requests described by an ``Endpoint`` and returns raw data or decoded values.
 ///
@@ -25,11 +26,15 @@ public extension HTTPClient {
 /// The priority of the calling task is passed on: it orders requests waiting in the ``RequestLimiter``
 /// and sets the priority of the underlying `URLSessionTask`.
 ///
-/// A GET that times out or loses its connection is sent once more. With HTTP/3 every request to a host
-/// shares one QUIC connection; when the network silently drops its packets, all of them hang until the
-/// timeout. The stalled connection is closed by then, so the retry opens a new one.
+/// Some networks drop QUIC packets once the handshake is done. With HTTP/3 every request to a host shares
+/// that connection, so all of them hang until they time out, and a new QUIC connection stalls the same way.
+/// After the first request that times out or loses its connection, the client switches to a fallback
+/// session that only speaks TCP (HTTP/2) for the rest of its life, and sends a GET once more on it.
 public final class URLSessionHTTPClient: HTTPClient {
     private let session: URLSession
+    private let fallbackSession: URLSession?
+    /// `true` once a request has stalled on `session`. From then on every request uses `fallbackSession`.
+    private let hasStalled = OSAllocatedUnfairLock(initialState: false)
     private let cache: ResponseCache?
     private let limiter: RequestLimiter?
     private let timeout: TimeInterval
@@ -38,6 +43,8 @@ public final class URLSessionHTTPClient: HTTPClient {
     /// - Parameters:
     ///   - session: The session used to perform requests. Defaults to ``makeSession(urlCache:)``.
     ///     Inject a custom one in tests.
+    ///   - fallbackSession: Used after a stall on `session`. Defaults to ``makeFallbackSession(urlCache:)``.
+    ///     Pass `nil` to keep retrying on `session`.
     ///   - cache: Optional cache for GET responses. Pass `nil` to always hit the network.
     ///   - limiter: Optional cap on concurrent requests. Pass `nil` for no cap.
     ///   - timeout: Request timeout in seconds. Short enough that a stalled request can be retried
@@ -45,12 +52,14 @@ public final class URLSessionHTTPClient: HTTPClient {
     ///   - makeDecoder: Builds the decoder for each response. Defaults to snake_case keys.
     public init(
         session: URLSession = URLSessionHTTPClient.makeSession(),
+        fallbackSession: URLSession? = URLSessionHTTPClient.makeFallbackSession(),
         cache: ResponseCache? = nil,
         limiter: RequestLimiter? = nil,
         timeout: TimeInterval = URLSessionHTTPClient.defaultTimeout,
         makeDecoder: @escaping @Sendable () -> JSONDecoder = URLSessionHTTPClient.defaultDecoder
     ) {
         self.session = session
+        self.fallbackSession = fallbackSession
         self.cache = cache
         self.limiter = limiter
         self.timeout = timeout
@@ -98,20 +107,28 @@ public final class URLSessionHTTPClient: HTTPClient {
         return try result.get()
     }
 
-    /// Sends the request, retrying a GET once if the connection stalled.
+    /// Sends the request, switching to the fallback session and retrying a GET once if the connection stalled.
     private func load(_ request: URLRequest) async throws(APIError) -> Data {
         let isIdempotent = request.httpMethod == HTTPMethod.get.rawValue
         do {
-            return try await loadOnce(request)
-        } catch let error as URLError where isIdempotent && Self.isStall(error) {
+            return try await loadOnce(request, on: currentSession)
+        } catch let error as URLError where Self.isStall(error) {
+            hasStalled.withLock { $0 = true }
+            guard isIdempotent else { throw APIError(error) }
             do {
-                return try await loadOnce(request)
+                return try await loadOnce(request, on: currentSession)
             } catch {
                 throw Self.apiError(from: error)
             }
         } catch {
             throw Self.apiError(from: error)
         }
+    }
+
+    /// The session new requests should use.
+    var currentSession: URLSession {
+        guard let fallbackSession, hasStalled.withLock({ $0 }) else { return session }
+        return fallbackSession
     }
 
     /// `true` for failures a fresh connection may fix.
@@ -121,7 +138,7 @@ public final class URLSessionHTTPClient: HTTPClient {
 
     /// Sends the request and validates the status code. Transport failures are thrown as `URLError`
     /// so ``load(_:)`` can tell a stall from other errors; anything else is already an ``APIError``.
-    private func loadOnce(_ request: URLRequest) async throws -> Data {
+    private func loadOnce(_ request: URLRequest, on session: URLSession) async throws -> Data {
         let data: Data
         let response: URLResponse
         do {
@@ -182,6 +199,22 @@ public extension URLSessionHTTPClient {
     /// A dedicated session built from ``makeConfiguration(urlCache:)``.
     static func makeSession(urlCache: URLCache = .shared) -> URLSession {
         URLSession(configuration: makeConfiguration(urlCache: urlCache))
+    }
+
+    /// ``makeConfiguration(urlCache:)`` limited to TLS 1.2, which keeps the session on TCP.
+    ///
+    /// `URLSession` has no public switch to turn HTTP/3 off, and `assumesHTTP3Capable = false` does not stop it
+    /// once the server has advertised `Alt-Svc: h3`. QUIC requires TLS 1.3, so capping TLS at 1.2 is what makes
+    /// the session fall back to HTTP/2 over TCP. TLS 1.2 still meets App Transport Security.
+    static func makeFallbackConfiguration(urlCache: URLCache = .shared) -> URLSessionConfiguration {
+        let configuration = makeConfiguration(urlCache: urlCache)
+        configuration.tlsMaximumSupportedProtocolVersion = .TLSv12
+        return configuration
+    }
+
+    /// A TCP-only session built from ``makeFallbackConfiguration(urlCache:)``.
+    static func makeFallbackSession(urlCache: URLCache = .shared) -> URLSession {
+        URLSession(configuration: makeFallbackConfiguration(urlCache: urlCache))
     }
 }
 

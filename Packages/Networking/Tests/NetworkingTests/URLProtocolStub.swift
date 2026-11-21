@@ -10,9 +10,11 @@ final class URLProtocolStub: URLProtocol, @unchecked Sendable {
     static let priorities = PriorityLog()
 
     /// A session whose requests are all handled by this stub.
-    static func makeSession() -> URLSession {
+    /// - Parameter headers: Added to every request, to tell sessions apart in the handler.
+    static func makeSession(headers: [String: String] = [:]) -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [URLProtocolStub.self]
+        configuration.httpAdditionalHeaders = headers
         return URLSession(configuration: configuration)
     }
 
@@ -52,6 +54,7 @@ final class RequestLog: @unchecked Sendable {
     private var storage: [URLRequest] = []
 
     var count: Int { lock.withLock { storage.count } }
+    var all: [URLRequest] { lock.withLock { storage } }
 
     func record(_ request: URLRequest) { lock.withLock { storage.append(request) } }
     func reset() { lock.withLock { storage.removeAll() } }
