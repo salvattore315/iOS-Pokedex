@@ -1,6 +1,8 @@
 import SwiftUI
 
 /// Header on the red casing: monospaced title on the left, link and battery status on the right.
+/// Paints its own `shell` background, up into the status bar, so the `onShell` texts stay readable
+/// whatever the screen behind it uses.
 public struct DeviceTopBar: View {
     private let title: String
 
@@ -19,6 +21,7 @@ public struct DeviceTopBar: View {
         }
         .padding(.horizontal, Spacing.lg)
         .padding(.vertical, Spacing.sm)
+        .background(Color.DS.shell.ignoresSafeArea(edges: .top))
     }
 }
 
@@ -39,5 +42,5 @@ public struct DeviceStatus: View {
 }
 
 #Preview {
-    DeviceTopBar("Pokédex").background(Color.DS.shell)
+    DeviceTopBar("Pokédex")
 }
