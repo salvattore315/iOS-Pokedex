@@ -22,7 +22,8 @@ struct RootView: View {
                         PokemonDetailView(viewModel: PokemonDetailViewModel(
                             id: id,
                             service: dependencies.service,
-                            calculateWeaknesses: DefaultCalculateWeaknessesUseCase(service: dependencies.service)
+                            calculateWeaknesses: DefaultCalculateWeaknessesUseCase(service: dependencies.service),
+                            groupLocations: dependencies.groupLocations
                         ))
                     }
             }
