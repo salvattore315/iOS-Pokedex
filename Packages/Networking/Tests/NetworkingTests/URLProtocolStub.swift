@@ -6,6 +6,8 @@ final class URLProtocolStub: URLProtocol, @unchecked Sendable {
 
     nonisolated(unsafe) static var handler: Handler?
     static let requests = RequestLog()
+    /// Priority of the `URLSessionTask` behind each request, in arrival order.
+    static let priorities = PriorityLog()
 
     /// A session whose requests are all handled by this stub.
     static func makeSession() -> URLSession {
@@ -18,6 +20,7 @@ final class URLProtocolStub: URLProtocol, @unchecked Sendable {
     static func reset(handler: @escaping Handler) {
         self.handler = handler
         requests.reset()
+        priorities.reset()
     }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
@@ -25,6 +28,7 @@ final class URLProtocolStub: URLProtocol, @unchecked Sendable {
 
     override func startLoading() {
         Self.requests.record(request)
+        Self.priorities.record(task?.priority)
         guard let handler = Self.handler else {
             client?.urlProtocol(self, didFailWithError: URLError(.unknown))
             return
@@ -50,6 +54,17 @@ final class RequestLog: @unchecked Sendable {
     var count: Int { lock.withLock { storage.count } }
 
     func record(_ request: URLRequest) { lock.withLock { storage.append(request) } }
+    func reset() { lock.withLock { storage.removeAll() } }
+}
+
+/// Thread-safe record of task priorities seen by the stub.
+final class PriorityLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [Float?] = []
+
+    var all: [Float?] { lock.withLock { storage } }
+
+    func record(_ priority: Float?) { lock.withLock { storage.append(priority) } }
     func reset() { lock.withLock { storage.removeAll() } }
 }
 

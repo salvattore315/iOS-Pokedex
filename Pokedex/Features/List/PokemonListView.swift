@@ -88,7 +88,8 @@ struct PokemonListView: View {
                         card(for: item)
                     }
                     .buttonStyle(.plain)
-                    .task { await viewModel.loadTypes(for: item.id) }
+                    // Low priority so the detail screen goes first; cancelled when the card scrolls away.
+                    .task(priority: .utility) { await viewModel.loadTypes(for: item.id) }
                     .onAppear { Task { await viewModel.loadMoreIfNeeded(after: item) } }
                 }
             } footer: {
