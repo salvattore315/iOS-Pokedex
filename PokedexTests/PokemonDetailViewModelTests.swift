@@ -160,6 +160,8 @@ private final class RecoveringDetailService: PokemonService, @unchecked Sendable
     func pokemonIndex() async throws(AppError) -> [PokemonSummary] { throw .unexpected }
     func pokemonPage(offset: Int, limit: Int) async throws(AppError) -> Page<PokemonSummary> { throw .unexpected }
     func damageRelations(for type: PokemonType) async throws(AppError) -> TypeDamageRelations { throw .unexpected }
+    func locationName(ofArea area: String) async throws(AppError) -> String { throw .unexpected }
+    func regionName(ofLocation location: String) async throws(AppError) -> String? { throw .unexpected }
     func pokemonIDs(ofType type: PokemonType) async throws(AppError) -> Set<Int> { throw .unexpected }
     func speciesIDs(inGeneration id: Int) async throws(AppError) -> Set<Int> { throw .unexpected }
 }
@@ -197,6 +199,8 @@ private struct DetailStubService: PokemonService {
     func pokemonIndex() async throws(AppError) -> [PokemonSummary] { throw .unexpected }
     func pokemonPage(offset: Int, limit: Int) async throws(AppError) -> Page<PokemonSummary> { throw .unexpected }
     func damageRelations(for type: PokemonType) async throws(AppError) -> TypeDamageRelations { throw .unexpected }
+    func locationName(ofArea area: String) async throws(AppError) -> String { throw .unexpected }
+    func regionName(ofLocation location: String) async throws(AppError) -> String? { throw .unexpected }
     func pokemonIDs(ofType type: PokemonType) async throws(AppError) -> Set<Int> { throw .unexpected }
     func speciesIDs(inGeneration id: Int) async throws(AppError) -> Set<Int> { throw .unexpected }
 }
