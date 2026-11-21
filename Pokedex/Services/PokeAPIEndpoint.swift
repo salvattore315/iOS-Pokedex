@@ -20,6 +20,8 @@ struct PokeAPIEndpoint: Endpoint {
     static func pokemon(id: Int) -> Self { Self(path: "pokemon/\(id)") }
     static func species(id: Int) -> Self { Self(path: "pokemon-species/\(id)") }
     static func encounters(pokemonID: Int) -> Self { Self(path: "pokemon/\(pokemonID)/encounters") }
+    static func locationArea(name: String) -> Self { Self(path: "location-area/\(name)") }
+    static func location(name: String) -> Self { Self(path: "location/\(name)") }
     static func type(_ type: PokemonType) -> Self { Self(path: "type/\(type.rawValue)") }
     static func generation(id: Int) -> Self { Self(path: "generation/\(id)") }
 }

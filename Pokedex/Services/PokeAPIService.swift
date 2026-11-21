@@ -47,6 +47,16 @@ struct PokeAPIService: PokemonService {
         return dtos.map { $0.toDomain() }
     }
 
+    func locationName(ofArea area: String) async throws(AppError) -> String {
+        let dto: LocationAreaDTO = try await get(PokeAPIEndpoint.locationArea(name: area))
+        return dto.location.name
+    }
+
+    func regionName(ofLocation location: String) async throws(AppError) -> String? {
+        let dto: LocationDTO = try await get(PokeAPIEndpoint.location(name: location))
+        return dto.region?.name
+    }
+
     func damageRelations(for type: PokemonType) async throws(AppError) -> TypeDamageRelations {
         let dto: TypeDTO = try await get(PokeAPIEndpoint.type(type))
         return dto.toDamageRelations()

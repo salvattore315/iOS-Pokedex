@@ -64,6 +64,8 @@ final class MockPokemonService: PokemonService, @unchecked Sendable {
     func evolutionChain(url: URL) async throws(AppError) -> EvolutionNode { throw .unexpected }
     func encounters(pokemonID: Int) async throws(AppError) -> [Encounter] { throw .unexpected }
     func damageRelations(for type: PokemonType) async throws(AppError) -> TypeDamageRelations { throw .unexpected }
+    func locationName(ofArea area: String) async throws(AppError) -> String { throw .unexpected }
+    func regionName(ofLocation location: String) async throws(AppError) -> String? { throw .unexpected }
 
     func pokemonIDs(ofType type: PokemonType) async throws(AppError) -> Set<Int> {
         if let filterError { throw filterError }

@@ -10,6 +10,10 @@ protocol PokemonService: Sendable {
     func species(id: Int) async throws(AppError) -> PokemonSpecies
     func evolutionChain(url: URL) async throws(AppError) -> EvolutionNode
     func encounters(pokemonID: Int) async throws(AppError) -> [Encounter]
+    /// The location slug a location area belongs to, for example "viridian-forest-area" → "viridian-forest".
+    func locationName(ofArea area: String) async throws(AppError) -> String
+    /// The region slug of a location, for example "viridian-forest" → "kanto". `nil` if it has none.
+    func regionName(ofLocation location: String) async throws(AppError) -> String?
     func damageRelations(for type: PokemonType) async throws(AppError) -> TypeDamageRelations
     func pokemonIDs(ofType type: PokemonType) async throws(AppError) -> Set<Int>
     func speciesIDs(inGeneration id: Int) async throws(AppError) -> Set<Int>

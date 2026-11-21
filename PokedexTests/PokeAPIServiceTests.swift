@@ -27,6 +27,18 @@ struct PokeAPIServiceTests {
         #expect(chain.stages.count == 3)
     }
 
+    @Test func resolvesTheLocationOfAnArea() async throws {
+        client.stub("location-area/viridian-forest-area", json: #"{"location": {"name": "viridian-forest", "url": "https://pokeapi.co/api/v2/location/155/"}}"#)
+        #expect(try await service.locationName(ofArea: "viridian-forest-area") == "viridian-forest")
+    }
+
+    @Test func resolvesTheRegionOfALocation() async throws {
+        client.stub("location/viridian-forest", json: #"{"region": {"name": "kanto", "url": "https://pokeapi.co/api/v2/region/1/"}}"#)
+        client.stub("location/nowhere", json: #"{"region": null}"#)
+        #expect(try await service.regionName(ofLocation: "viridian-forest") == "kanto")
+        #expect(try await service.regionName(ofLocation: "nowhere") == nil)
+    }
+
     @Test func convertsTransportErrorsToAppErrors() async {
         client.stub("pokemon/9999", error: .http(statusCode: 404))
         await #expect(throws: AppError.notFound) {
