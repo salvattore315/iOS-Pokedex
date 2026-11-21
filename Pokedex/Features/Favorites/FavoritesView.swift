@@ -53,13 +53,7 @@ struct FavoritesView: View {
         ZStack {
             NavigationLink(value: favorite.id) { EmptyView() }.opacity(0)
             PokemonCard(name: favorite.name, number: favorite.id, types: favorite.types.map(\.badge)) {
-                AsyncImage(url: PokemonSummary(id: favorite.id, name: favorite.name).artworkURL) { phase in
-                    if let image = phase.image {
-                        image.resizable().scaledToFit()
-                    } else {
-                        Color.clear
-                    }
-                }
+                ArtworkImage(url: PokemonSummary(id: favorite.id, name: favorite.name).artworkURL, priority: .utility)
             }
         }
         .listRowBackground(Color.clear)
