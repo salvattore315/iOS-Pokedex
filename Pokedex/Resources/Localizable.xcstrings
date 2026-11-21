@@ -341,24 +341,58 @@
         }
       }
     },
-    "favorites.placeholder.message": {
+    "favorites.empty.message": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coming soon."
+            "value": "Tap the heart on a Pokémon to save it here."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Próximamente."
+            "value": "Toca el corazón de un Pokémon para guardarlo aquí."
           }
         }
       }
     },
-    "favorites.placeholder.title": {
+    "favorites.empty.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No favorites yet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aún no hay favoritos"
+          }
+        }
+      }
+    },
+    "favorites.remove": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar"
+          }
+        }
+      }
+    },
+    "favorites.title": {
       "extractionState": "manual",
       "localizations": {
         "en": {
