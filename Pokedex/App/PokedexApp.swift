@@ -8,7 +8,7 @@ struct PokedexApp: App {
     @State private var isSplashVisible = !ProcessInfo.processInfo.arguments.contains(SplashVideoView.skipLaunchArgument)
 
     init() {
-        // AsyncImage and the API client cache responses on disk through the shared URL cache.
+        // The HTTP client caches API responses and artwork on disk through the shared URL cache.
         // The default size is too small for the grid.
         URLCache.shared = URLCache(memoryCapacity: 50 * 1024 * 1024, diskCapacity: 200 * 1024 * 1024)
         #if DEBUG
@@ -22,6 +22,7 @@ struct PokedexApp: App {
         WindowGroup {
             ZStack {
                 RootView(dependencies: dependencies)
+                    .environment(\.imageLoader, dependencies.imageLoader)
                 if isSplashVisible {
                     SplashVideoView {
                         withAnimation(.easeOut(duration: 0.25)) { isSplashVisible = false }
@@ -40,6 +41,8 @@ struct AppDependencies {
     let favorites: any FavoritesRepository
     /// Shared so resolved regions are reused by every detail screen.
     let groupLocations: any GroupLocationsByRegionUseCase
+    /// Artwork for cards and the detail screen, loaded through the same client as the API.
+    let imageLoader: ImageLoader
 
     static func live(mode: ListSourceMode = .current) -> AppDependencies {
         // A few requests at a time, so the detail screen never queues behind dozens of list cards.
@@ -77,7 +80,8 @@ struct AppDependencies {
             service: service,
             listSource: listSource,
             favorites: FavoritesStore(modelContainer: container),
-            groupLocations: DefaultGroupLocationsByRegionUseCase(service: service)
+            groupLocations: DefaultGroupLocationsByRegionUseCase(service: service),
+            imageLoader: ImageLoader(client: client)
         )
     }
 }
