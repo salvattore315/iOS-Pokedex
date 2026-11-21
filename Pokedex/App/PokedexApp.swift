@@ -34,7 +34,8 @@ struct AppDependencies {
     let listSource: any PokemonListSource
 
     static func live(mode: ListSourceMode = .current) -> AppDependencies {
-        let client = URLSessionHTTPClient(cache: ResponseCache())
+        // A few requests at a time, so the detail screen never queues behind dozens of list cards.
+        let client = URLSessionHTTPClient(cache: ResponseCache(), limiter: RequestLimiter(maxConcurrent: 4))
         let service = PokeAPIService(client: client)
         let container: ModelContainer
         do {
