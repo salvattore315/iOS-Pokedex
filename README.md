@@ -11,7 +11,8 @@ A Pokédex for iOS built with SwiftUI and Swift 6 on top of [PokéAPI](https://p
 - **Detail.** Each Pokémon's page shows:
   - Artwork, types, height and weight, and base stats.
   - Weaknesses (combined for dual types) and the evolution chain, whose stages can be tapped.
-  - Where to find it in the games, and its cry on iOS 18.4 or later.
+  - Where to find it in the games, grouped by region (Kanto, Johto, Hoenn…) and listing the games of each area.
+  - Its cry, on iOS 18.4 or later.
   - Each section loads on its own and can be retried on its own.
 - **Favorites.** Save a Pokémon from its detail screen and find it in the Favorites tab. The tab works offline. Swipe a card to remove it.
 - **Splash.** A short intro video, with light and dark versions. It is skipped when Reduce Motion is on.
@@ -20,6 +21,7 @@ A Pokédex for iOS built with SwiftUI and Swift 6 on top of [PokéAPI](https://p
 |---|---|---|
 | List | <img src="docs/list-light.png" width="250" alt="List, light mode"> | <img src="docs/list-dark.png" width="250" alt="List, dark mode"> |
 | Detail | <img src="docs/detail-light.png" width="250" alt="Detail, light mode"> | <img src="docs/detail-dark.png" width="250" alt="Detail, dark mode"> |
+| Locations by region | <img src="docs/locations-light.png" width="250" alt="Locations grouped by region, light mode"> | <img src="docs/locations-dark.png" width="250" alt="Locations grouped by region, dark mode"> |
 
 ## Requirements
 
@@ -87,6 +89,8 @@ Data           PokeAPIService, DTOs and mappers (Services/), SwiftData stores (P
   - It also deduplicates requests in flight: a second caller for the same URL awaits the first request.
   - When every caller of a request has been cancelled, for example cards scrolled off screen, the request is cancelled too.
   - Artwork and HTTP responses also go through a larger `URLCache`, on disk.
+- **Locations by region.** PokéAPI has no direct link from a location area to its region, so each area is resolved in two steps (location area → location → region). The lookups run at low priority so they never delay the rest of the detail screen, and resolved regions are cached and shared by every detail screen. Areas whose region cannot be resolved go to an "Unknown" group.
+- **HTTP/3 stalls.** PokéAPI is served over HTTP/3, and some networks drop QUIC packets right after the handshake: every request then hangs until it times out. The client uses its own `URLSession` with a 15 s timeout, and after the first stall it moves to a second session limited to TLS 1.2. QUIC needs TLS 1.3, so that session stays on HTTP/2 over TCP. Stalled GETs are retried once on it. Both sessions share the disk cache.
 - **Request limiter.** At most four requests run at once, and a free slot goes to the waiting request with the highest task priority.
   - Card types load at `.utility` priority, so the detail screen never waits behind dozens of cards.
   - This took the detail screen from about 30 s to about 2 s on a slow connection.

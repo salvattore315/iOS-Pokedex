@@ -27,7 +27,7 @@ public extension Endpoint {
 
     /// Builds the `URLRequest` for this endpoint.
     /// - Throws: ``APIError/invalidURL`` if the components do not form a valid URL.
-    func makeRequest(timeout: TimeInterval = 30) throws(APIError) -> URLRequest {
+    func makeRequest(timeout: TimeInterval = 15) throws(APIError) -> URLRequest {
         let url = path.isEmpty ? baseURL : baseURL.appending(path: path)
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             throw .invalidURL
@@ -39,6 +39,8 @@ public extension Endpoint {
 
         var request = URLRequest(url: finalURL, timeoutInterval: timeout)
         request.httpMethod = method.rawValue
+        // Never start on HTTP/3 before the server has advertised it (this is also the system default).
+        request.assumesHTTP3Capable = false
         request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         for (field, value) in headers {
