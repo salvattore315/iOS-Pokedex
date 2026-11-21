@@ -33,6 +33,8 @@ struct AppDependencies {
     let service: any PokemonService
     let listSource: any PokemonListSource
     let favorites: any FavoritesRepository
+    /// Shared so resolved regions are reused by every detail screen.
+    let groupLocations: any GroupLocationsByRegionUseCase
 
     static func live(mode: ListSourceMode = .current) -> AppDependencies {
         // A few requests at a time, so the detail screen never queues behind dozens of list cards.
@@ -51,6 +53,11 @@ struct AppDependencies {
         case .local: local
         case .remote: RemoteListSource(service: service, local: local)
         }
-        return AppDependencies(service: service, listSource: listSource, favorites: FavoritesStore(modelContainer: container))
+        return AppDependencies(
+            service: service,
+            listSource: listSource,
+            favorites: FavoritesStore(modelContainer: container),
+            groupLocations: DefaultGroupLocationsByRegionUseCase(service: service)
+        )
     }
 }
