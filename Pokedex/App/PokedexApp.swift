@@ -32,6 +32,7 @@ struct PokedexApp: App {
 struct AppDependencies {
     let service: any PokemonService
     let listSource: any PokemonListSource
+    let favorites: any FavoritesRepository
     /// Shared so resolved regions are reused by every detail screen.
     let groupLocations: any GroupLocationsByRegionUseCase
 
@@ -41,7 +42,7 @@ struct AppDependencies {
         let service = PokeAPIService(client: client)
         let container: ModelContainer
         do {
-            container = try ModelContainer(for: PokemonIndexEntry.self)
+            container = try ModelContainer(for: PokemonIndexEntry.self, FavoritePokemon.self)
         } catch {
             // Without a store the app cannot keep its index; there is nothing sensible to fall back to.
             fatalError("Could not create the SwiftData container: \(error)")
@@ -55,6 +56,7 @@ struct AppDependencies {
         return AppDependencies(
             service: service,
             listSource: listSource,
+            favorites: FavoritesStore(modelContainer: container),
             groupLocations: DefaultGroupLocationsByRegionUseCase(service: service)
         )
     }

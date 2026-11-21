@@ -19,8 +19,21 @@ struct PokemonDetailViewModelTests {
         evolvesTo: [EvolutionNode(speciesID: 2, name: "ivysaur", minLevel: 16, evolvesTo: [])]
     )
 
-    private func makeViewModel(_ service: DetailStubService, weaknesses: Result<[Weakness], AppError> = .success([])) -> PokemonDetailViewModel {
-        PokemonDetailViewModel(id: 1, service: service, calculateWeaknesses: StubWeaknesses(result: weaknesses), groupLocations: AllInKanto())
+    private static let addedAt = Date(timeIntervalSince1970: 1_000)
+
+    private func makeViewModel(
+        _ service: DetailStubService,
+        weaknesses: Result<[Weakness], AppError> = .success([]),
+        favorites: InMemoryFavorites = InMemoryFavorites()
+    ) -> PokemonDetailViewModel {
+        PokemonDetailViewModel(
+            id: 1,
+            service: service,
+            calculateWeaknesses: StubWeaknesses(result: weaknesses),
+            favorites: favorites,
+            groupLocations: AllInKanto(),
+            now: { [addedAt = Self.addedAt] in addedAt }
+        )
     }
 
     @Test func loadsEverySection() async {
@@ -80,6 +93,56 @@ struct PokemonDetailViewModelTests {
     }
 }
 
+// MARK: - Favorite
+
+extension PokemonDetailViewModelTests {
+    @Test func readsTheStoredFavoriteStateOnLoad() async {
+        let favorites = InMemoryFavorites([Favorite(Self.bulbasaur, addedAt: Self.addedAt)])
+        let viewModel = makeViewModel(DetailStubService(pokemon: .success(Self.bulbasaur)), favorites: favorites)
+
+        await viewModel.load()
+
+        #expect(viewModel.isFavorite)
+    }
+
+    @Test func toggleAddsAndRemovesTheFavorite() async {
+        let favorites = InMemoryFavorites()
+        let viewModel = makeViewModel(DetailStubService(pokemon: .success(Self.bulbasaur)), favorites: favorites)
+        await viewModel.load()
+        #expect(viewModel.isFavorite == false)
+
+        await viewModel.toggleFavorite()
+        #expect(viewModel.isFavorite)
+        #expect(favorites.stored[1] == Favorite(id: 1, name: "bulbasaur", types: [.grass, .poison], addedAt: Self.addedAt))
+
+        await viewModel.toggleFavorite()
+        #expect(viewModel.isFavorite == false)
+        #expect(favorites.stored.isEmpty)
+    }
+
+    @Test func toggleDoesNothingBeforeThePokemonLoads() async {
+        let favorites = InMemoryFavorites()
+        let viewModel = makeViewModel(DetailStubService(pokemon: .failure(.offline)), favorites: favorites)
+        await viewModel.load()
+
+        await viewModel.toggleFavorite()
+
+        #expect(viewModel.isFavorite == false)
+        #expect(favorites.stored.isEmpty)
+    }
+
+    @Test func failedToggleKeepsTheStoredState() async {
+        let favorites = InMemoryFavorites()
+        let viewModel = makeViewModel(DetailStubService(pokemon: .success(Self.bulbasaur)), favorites: favorites)
+        await viewModel.load()
+        favorites.error = InMemoryFavorites.Failure()
+
+        await viewModel.toggleFavorite()
+
+        #expect(viewModel.isFavorite == false)
+    }
+}
+
 // MARK: - Retry
 
 extension PokemonDetailViewModelTests {
@@ -92,7 +155,13 @@ extension PokemonDetailViewModelTests {
         )
         let weakness = Weakness(type: .fire, multiplier: 2)
         let weaknesses = RecoveringWeaknesses(result: [weakness])
-        let viewModel = PokemonDetailViewModel(id: 1, service: service, calculateWeaknesses: weaknesses, groupLocations: AllInKanto())
+        let viewModel = PokemonDetailViewModel(
+            id: 1,
+            service: service,
+            calculateWeaknesses: weaknesses,
+            favorites: InMemoryFavorites(),
+            groupLocations: AllInKanto()
+        )
 
         await viewModel.load()
         #expect(viewModel.evolutions == .failed(.offline))

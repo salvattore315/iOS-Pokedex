@@ -15,24 +15,34 @@ final class PokemonDetailViewModel {
     private(set) var weaknesses: ViewState<[Weakness]> = .idle
     /// Where the Pokémon can be found, grouped by region.
     private(set) var locations: ViewState<[RegionLocations]> = .idle
+    private(set) var isFavorite = false
 
     private let service: any PokemonService
     private let calculateWeaknesses: any CalculateWeaknessesUseCase
+    private let favorites: any FavoritesRepository
     private let groupLocations: any GroupLocationsByRegionUseCase
+    private let now: @Sendable () -> Date
 
+    /// - Parameter now: Date stamped on new favorites. Inject a fixed one in tests.
     init(
         id: Int,
         service: any PokemonService,
         calculateWeaknesses: any CalculateWeaknessesUseCase,
-        groupLocations: any GroupLocationsByRegionUseCase
+        favorites: any FavoritesRepository,
+        groupLocations: any GroupLocationsByRegionUseCase,
+        now: @escaping @Sendable () -> Date = { .now }
     ) {
         self.id = id
         self.service = service
         self.calculateWeaknesses = calculateWeaknesses
+        self.favorites = favorites
         self.groupLocations = groupLocations
+        self.now = now
     }
 
     func load() async {
+        // Read from the local store, so the button is right even if the Pokémon fails to load.
+        isFavorite = (try? await favorites.isFavorite(id: id)) ?? false
         pokemon = .loading
         let loaded: Pokemon
         do throws(AppError) {
@@ -47,6 +57,25 @@ final class PokemonDetailViewModel {
         async let typeWeaknesses: Void = loadWeaknesses(for: loaded.types)
         async let placesFound: Void = loadLocations()
         _ = await (speciesAndEvolutions, typeWeaknesses, placesFound)
+    }
+
+    // MARK: - Favorite
+
+    /// Adds the Pokémon to favorites or removes it. Needs the Pokémon to be loaded.
+    /// If the store fails, the button keeps showing the stored state.
+    func toggleFavorite() async {
+        guard let loaded = pokemon.value else { return }
+        let shouldAdd = !isFavorite
+        do {
+            if shouldAdd {
+                try await favorites.add(Favorite(loaded, addedAt: now()))
+            } else {
+                try await favorites.remove(id: loaded.id)
+            }
+            isFavorite = shouldAdd
+        } catch {
+            isFavorite = (try? await favorites.isFavorite(id: loaded.id)) ?? isFavorite
+        }
     }
 
     // MARK: - Retry
