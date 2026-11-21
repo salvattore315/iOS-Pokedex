@@ -37,9 +37,10 @@ struct AppDependencies {
 
     static func live(mode: ListSourceMode = .current) -> AppDependencies {
         // A few requests at a time, so the detail screen never queues behind dozens of list cards.
-        // Own session on the disk cache sized in init(); stalled requests are retried once on a new connection.
+        // Both sessions share the disk cache sized in init(). After an HTTP/3 stall the client moves to the TCP one.
         let client = URLSessionHTTPClient(
             session: URLSessionHTTPClient.makeSession(urlCache: .shared),
+            fallbackSession: URLSessionHTTPClient.makeFallbackSession(urlCache: .shared),
             cache: ResponseCache(),
             limiter: RequestLimiter(maxConcurrent: 4)
         )
