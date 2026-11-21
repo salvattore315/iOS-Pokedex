@@ -13,15 +13,23 @@ final class PokemonDetailViewModel {
     /// Every stage of the evolution chain, in order.
     private(set) var evolutions: ViewState<[EvolutionNode]> = .idle
     private(set) var weaknesses: ViewState<[Weakness]> = .idle
-    private(set) var encounters: ViewState<[Encounter]> = .idle
+    /// Where the Pokémon can be found, grouped by region.
+    private(set) var locations: ViewState<[RegionLocations]> = .idle
 
     private let service: any PokemonService
     private let calculateWeaknesses: any CalculateWeaknessesUseCase
+    private let groupLocations: any GroupLocationsByRegionUseCase
 
-    init(id: Int, service: any PokemonService, calculateWeaknesses: any CalculateWeaknessesUseCase) {
+    init(
+        id: Int,
+        service: any PokemonService,
+        calculateWeaknesses: any CalculateWeaknessesUseCase,
+        groupLocations: any GroupLocationsByRegionUseCase
+    ) {
         self.id = id
         self.service = service
         self.calculateWeaknesses = calculateWeaknesses
+        self.groupLocations = groupLocations
     }
 
     func load() async {
@@ -37,8 +45,8 @@ final class PokemonDetailViewModel {
 
         async let speciesAndEvolutions: Void = loadSpecies(id: loaded.speciesID)
         async let typeWeaknesses: Void = loadWeaknesses(for: loaded.types)
-        async let locations: Void = loadEncounters()
-        _ = await (speciesAndEvolutions, typeWeaknesses, locations)
+        async let placesFound: Void = loadLocations()
+        _ = await (speciesAndEvolutions, typeWeaknesses, placesFound)
     }
 
     // MARK: - Retry
@@ -56,9 +64,9 @@ final class PokemonDetailViewModel {
     }
 
     /// Loads the locations again. Does nothing until the Pokémon itself has loaded.
-    func retryEncounters() async {
+    func retryLocations() async {
         guard pokemon.value != nil else { return }
-        await loadEncounters()
+        await loadLocations()
     }
 
     // MARK: - Sections
@@ -93,13 +101,19 @@ final class PokemonDetailViewModel {
         }
     }
 
-    private func loadEncounters() async {
-        encounters = .loading
+    /// Only the encounters request can fail the section. Areas whose region cannot be
+    /// resolved still show up, in a group without a region.
+    private func loadLocations() async {
+        locations = .loading
         do throws(AppError) {
-            let result = try await service.encounters(pokemonID: id)
-            encounters = result.isEmpty ? .empty : .loaded(result)
+            let encounters = try await service.encounters(pokemonID: id)
+            guard !encounters.isEmpty else {
+                locations = .empty
+                return
+            }
+            locations = .loaded(await groupLocations.execute(encounters))
         } catch {
-            encounters = .failed(error)
+            locations = .failed(error)
         }
     }
 }
