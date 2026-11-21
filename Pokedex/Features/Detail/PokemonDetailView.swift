@@ -146,7 +146,7 @@ struct PokemonDetailView: View {
                         let isCurrent = stage.speciesID == pokemon.speciesID
                         NavigationLink(value: stage.speciesID) {
                             EvolutionNodeView(name: stage.name, level: stage.minLevel, isCurrent: isCurrent, tint: tint(of: pokemon)) {
-                                artwork(PokemonSummary(id: stage.speciesID, name: stage.name).artworkURL)
+                                artwork(PokemonSummary(id: stage.speciesID, name: stage.name).artworkURL, priority: .medium)
                             }
                         }
                         .buttonStyle(.plain)
@@ -222,14 +222,8 @@ struct PokemonDetailView: View {
         }
     }
 
-    private func artwork(_ url: URL?) -> some View {
-        AsyncImage(url: url) { phase in
-            if let image = phase.image {
-                image.resizable().scaledToFit()
-            } else {
-                Color.clear
-            }
-        }
+    private func artwork(_ url: URL?, priority: TaskPriority = .userInitiated) -> some View {
+        ArtworkImage(url: url, priority: priority)
     }
 
     private func tint(of pokemon: Pokemon) -> Color {
