@@ -86,7 +86,7 @@ enum ViewState<Value> {
 - `ResponseCache` (actor):
   - `NSCache<NSURL, NSData>` for responses. It evicts itself under memory pressure.
   - `[URL: Task<Data, Error>]` for requests in flight. A second caller for the same URL awaits the existing task instead of starting a new request.
-- Images go through `URLCache` (memory and disk) configured on the `URLSessionConfiguration`.
+- Images go through the same `HTTPClient` as the API, via the app's `ImageLoader` (decoded images in an `NSCache`). They share the session, its HTTP/2 fallback, the request limiter and the disk `URLCache`. Cards load at `.utility` priority and cancel their request when they leave the screen.
 
 The package knows nothing about Pokémon.
 

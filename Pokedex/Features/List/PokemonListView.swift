@@ -144,20 +144,14 @@ struct PokemonListView: View {
             number: item.id,
             types: (viewModel.types[item.id] ?? []).map(\.badge)
         ) {
-            AsyncImage(url: item.artworkURL) { phase in
-                if let image = phase.image {
-                    image.resizable().scaledToFit()
-                } else {
-                    Color.clear
-                }
-            }
+            ArtworkImage(url: item.artworkURL, priority: .utility)
         }
     }
 }
 
 extension PokemonSummary {
     /// Official artwork, built from the ID so the list needs no extra request per card.
-    /// `AsyncImage` caches it through `URLCache.shared`, sized in `PokedexApp`.
+    /// ``ImageLoader`` caches it in memory, and the HTTP client on disk through `URLCache.shared`.
     var artworkURL: URL? {
         URL(string: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/\(id).png")
     }
