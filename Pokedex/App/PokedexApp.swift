@@ -23,13 +23,14 @@ struct PokedexApp: App {
 struct AppDependencies {
     let service: any PokemonService
     let listSource: any PokemonListSource
+    let favorites: any FavoritesRepository
 
     static func live(mode: ListSourceMode = .current) -> AppDependencies {
         let client = URLSessionHTTPClient(cache: ResponseCache())
         let service = PokeAPIService(client: client)
         let container: ModelContainer
         do {
-            container = try ModelContainer(for: PokemonIndexEntry.self)
+            container = try ModelContainer(for: PokemonIndexEntry.self, FavoritePokemon.self)
         } catch {
             // Without a store the app cannot keep its index; there is nothing sensible to fall back to.
             fatalError("Could not create the SwiftData container: \(error)")
@@ -40,6 +41,6 @@ struct AppDependencies {
         case .local: local
         case .remote: RemoteListSource(service: service, local: local)
         }
-        return AppDependencies(service: service, listSource: listSource)
+        return AppDependencies(service: service, listSource: listSource, favorites: FavoritesStore(modelContainer: container))
     }
 }

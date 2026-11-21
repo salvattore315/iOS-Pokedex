@@ -14,12 +14,11 @@ struct PokemonDetailView: View {
     var body: some View {
         VStack(spacing: 0) {
             DetailTopBar(
-                isFavorite: false,
+                isFavorite: viewModel.isFavorite,
                 isCryAvailable: cryURL != nil,
                 onBack: { dismiss() },
                 onCry: { if let cryURL { cryPlayer.play(cryURL) } },
-                // Wired in the Favorites epic.
-                onFavorite: {}
+                onFavorite: { Task { await viewModel.toggleFavorite() } }
             )
             content
         }
