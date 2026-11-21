@@ -160,19 +160,32 @@ struct PokemonDetailView: View {
     private var locations: some View {
         section(
             String(localized: "detail.locations", defaultValue: "Locations"),
-            state: viewModel.encounters,
+            state: viewModel.locations,
             emptyText: String(localized: "detail.locations.empty", defaultValue: "Not found in the wild."),
-            retry: viewModel.retryEncounters
-        ) { encounters in
-            VStack(spacing: Spacing.sm) {
-                ForEach(encounters, id: \.locationArea) { encounter in
-                    LocationRow(
-                        title: encounter.locationArea.slugTitle,
-                        subtitle: encounter.versions.map(\.slugTitle).joined(separator: ", ")
-                    )
+            retry: viewModel.retryLocations
+        ) { groups in
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                ForEach(groups, id: \.region) { group in
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        Text(regionTitle(group.region).uppercased())
+                            .font(.mono(11, weight: .bold))
+                            .foregroundStyle(Color.DS.textSecondary)
+                            .accessibilityAddTraits(.isHeader)
+                        ForEach(group.encounters, id: \.locationArea) { encounter in
+                            LocationRow(
+                                title: encounter.locationArea.slugTitle,
+                                subtitle: encounter.versions.map(\.slugTitle).joined(separator: ", ")
+                            )
+                        }
+                    }
                 }
             }
         }
+    }
+
+    /// Region names are proper nouns and are not translated; only "Unknown" is.
+    private func regionTitle(_ region: String?) -> String {
+        region?.slugTitle ?? String(localized: "detail.locations.unknownRegion", defaultValue: "Unknown")
     }
 
     // MARK: - Helpers
